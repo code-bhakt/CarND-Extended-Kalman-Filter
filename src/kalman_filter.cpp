@@ -1,4 +1,5 @@
 #include "kalman_filter.h"
+#include "tools.h"
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -26,16 +27,58 @@ void KalmanFilter::Predict() {
   /**
    * TODO: predict the state
    */
+	x_ = F_ * x_;
+    MatrixXd Ft = F_.transpose();
+    P_ = F_ * P_ * Ft + Q_;
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
   /**
    * TODO: update the state by using Kalman Filter equations
    */
+	VectorXd y = z - H_ * x_;
+    MatrixXd Ht = H_.transpose();
+    MatrixXd S = H_ * P_ * Ht + R_;
+    MatrixXd Si = S.inverse();
+    MatrixXd K =  P_ * Ht * Si;
+  
+	// new state
+    x_ = x_ + (K * y);
+	long x_size = x_.size();
+	MatrixXd I = MatrixXd::Identity(x_size, x_size);
+    P_ = (I - K * H_) * P_;
 }
-
+Tools tools;
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   /**
    * TODO: update the state by using Extended Kalman Filter equations
    */
+  	
+	MatrixXd Hj = tools.CalculateJacobian(x_);
+    float rho = sqrt(x_(0) * x_(0) + x_(1) * x_(1));
+    float phi = atan2(x_(1), x_(0));
+    float rho_dot = (x_(0) * x_(2) + x_(1) * x_(3))/rho;
+    
+    VectorXd h_x(3);
+    h_x << rho, phi, rho_dot;
+	VectorXd y = z - h_x;
+  	float pi_2 = 2.0 * M_PI;
+	while(y(1) > M_PI || y(1) < -M_PI){
+    	if(y(1) > M_PI){
+        	y(1) = y(1) - pi_2;
+        } else{
+        	y(1) = y(1) + pi_2;
+        }
+    }
+  	
+  	MatrixXd Ht = Hj.transpose();
+    MatrixXd S = Hj * P_ * Ht + R_;
+    MatrixXd Si = S.inverse();
+    MatrixXd K =  P_ * Ht * Si;
+  	
+  	// new state
+    x_ = x_ + (K * y);
+	long x_size = x_.size();
+	MatrixXd I = MatrixXd::Identity(x_size, x_size);
+    P_ = (I - K * H_) * P_;
 }
